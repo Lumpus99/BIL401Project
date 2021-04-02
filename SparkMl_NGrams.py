@@ -1,5 +1,3 @@
-import findspark
-findspark.init("D:\\Spark\\spark-3.1.1-bin-hadoop2.7")
 import re
 from timeit import default_timer as timer
 
@@ -119,4 +117,5 @@ if __name__ == '__main__':
     model = PipelineModel.load('finalized_model')
 
     predictions = model.transform(test_set)
-    predictions.select("prediction").show()
+    predictions.show(50)
+
