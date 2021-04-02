@@ -14,7 +14,7 @@ def twitterQueryExample(query, TWITTER_BEARER_TOKEN):
 
     request = ApiRequest.ApiRequest(api, auth).pullData().parseData()
 
-    for i in request:
+    for i in request: #CSV Twitter index(0,1,2..), text="kendisi", "target"=0
         print("> Twitter", i)
 
 
@@ -28,7 +28,7 @@ def youtubeQueryExample(query, YOUTUBE_API_KEY):
     auth = auth.type(At.ApiKey).key(YOUTUBE_API_KEY).field("key")
     request2 = ApiRequest.ApiRequest(api, auth).pullData().parseData()
 
-    for i in request2:
+    for i in request2: #CSV dosyasi SÜTUNLAR= index(0,1,2..), text="kendisi", "target"=0
         print("> Youtube: ", i)
 
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
         tokens = json.load(f)
 
     print("Getting data from youtube...")
-    youtubeQueryExample("nLlhONHPpCw", tokens['youtube_api_key'])
+    youtubeQueryExample("Nj-bM6OqnE0", tokens['youtube_api_key'])
     print("===================================================================")
     print("Getting data from twitter...")
-    twitterQueryExample("Germany", tokens['twitter_bearer_token'])
+    twitterQueryExample("France", tokens['twitter_bearer_token'])

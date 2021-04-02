@@ -1,3 +1,5 @@
+import findspark
+findspark.init("D:\\Spark\\spark-3.1.1-bin-hadoop2.7")
 import re
 from timeit import default_timer as timer
 
@@ -40,35 +42,40 @@ def cleanData(text):
     return ' '.join(link.split()).strip()
 
 
-def fit_data(spark, train=1.0, test=0.0):
-    start = timer()
-
-    textfile_df = spark.read \
+def readfile(filename):
+    file_df = spark.read \
         .format("csv") \
         .option("header", "false") \
-        .load("training.1600000.processed.noemoticon.csv")
+        .load(filename)
 
-    textfile_df = textfile_df \
+    file_df = file_df \
         .withColumn("index", monotonically_increasing_id()) \
         .withColumnRenamed("_c0", "target") \
         .withColumnRenamed("_c5", "text")
-    textfile_df = textfile_df.select("index", "text", "target")
+    file_df = file_df.select("index", "text", "target")
 
-    textfile_df.show(5)
+    file_df.show(5)
 
     convert_udf = udf(lambda z: cleanData(z))
-    textfile_df = textfile_df.select("index", convert_udf(col("text")).alias("text"), "target")
+    file_df = file_df.select("index", convert_udf(col("text")).alias("text"), "target")
 
-    textfile_df.show(5)
+    file_df.show(5)
 
-    print("Number of entries: ", textfile_df.count())
+    print("Number of entries: ", file_df.count())
+    return file_df
+
+
+def fit_data(spark, train=1.0, test=0.0):
+    start = timer()
+
+    file_df = readfile("training.1600000.processed.noemoticon.csv")
 
     if train == 1.0:
-        train_set = textfile_df
+        train_set = file_df
         trigram_pipelinefit = build_trigrams().fit(train_set)
 
     else:
-        (train_set, test_set) = textfile_df.randomSplit([train, test], seed=2000)
+        (train_set, test_set) = file_df.randomSplit([train, test], seed=2000)
 
         print("Number of train data: ", train_set.count())
         print("Number of test data: ", test_set.count())
@@ -98,7 +105,7 @@ if __name__ == '__main__':
         .config(conf=conf) \
         .getOrCreate()
 
-    fit_data(spark)
+    # fit_data(spark)
     """
     Accuracy Score: 0.8068
     ROC-AUC: 0.8819
@@ -106,4 +113,10 @@ if __name__ == '__main__':
     """
 
     # do something with the model
+    file_df = readfile("training.1600000.processed.noemoticon.csv")
+    (train_set, test_set) = file_df.randomSplit([0.9, 0.1], seed=2000)
+
     model = PipelineModel.load('finalized_model')
+
+    predictions = model.transform(test_set)
+    predictions.select("prediction").show()
