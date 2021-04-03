@@ -8,7 +8,8 @@ from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from pyspark.ml.feature import ChiSqSelector, IDF, Tokenizer, StringIndexer, NGram, VectorAssembler, CountVectorizer
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, monotonically_increasing_id, udf
-
+import findspark
+findspark.init()
 
 def build_trigrams(n=3):
     tokenizer = [Tokenizer(inputCol="text", outputCol="words")]
@@ -118,4 +119,3 @@ if __name__ == '__main__':
 
     predictions = model.transform(test_set)
     predictions.show(50)
-
