@@ -1,15 +1,17 @@
 import re
 from timeit import default_timer as timer
 
+import findspark
 import pyspark as ps
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from pyspark.ml.feature import ChiSqSelector, IDF, Tokenizer, StringIndexer, NGram, VectorAssembler, CountVectorizer
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, monotonically_increasing_id, udf
-import findspark
+from pyspark.sql.functions import col, monotonically_increasing_id, udf, avg
+
 findspark.init()
+
 
 def build_trigrams(n=3):
     tokenizer = [Tokenizer(inputCol="text", outputCol="words")]
@@ -42,26 +44,29 @@ def cleanData(text):
 
 
 def readfile(filename):
-    file_df = spark.read \
-        .format("csv") \
-        .option("header", "false") \
-        .load(filename)
+    try:
+        file_df = spark.read \
+            .format("csv") \
+            .option("header", "false") \
+            .load(filename)
 
-    file_df = file_df \
-        .withColumn("index", monotonically_increasing_id()) \
-        .withColumnRenamed("_c0", "target") \
-        .withColumnRenamed("_c5", "text")
-    file_df = file_df.select("index", "text", "target")
+        file_df = file_df \
+            .withColumn("index", monotonically_increasing_id()) \
+            .withColumnRenamed("_c0", "target") \
+            .withColumnRenamed("_c5", "text")
+        file_df = file_df.select("index", "text", "target")
 
-    file_df.show(5)
+        file_df.show(5)
 
-    convert_udf = udf(lambda z: cleanData(z))
-    file_df = file_df.select("index", convert_udf(col("text")).alias("text"), "target")
+        convert_udf = udf(lambda z: cleanData(z))
+        file_df = file_df.select("index", convert_udf(col("text")).alias("text"), "target")
 
-    file_df.show(5)
+        file_df.show(5)
 
-    print("Number of entries: ", file_df.count())
-    return file_df
+        print("Number of entries: ", file_df.count())
+        return file_df
+    except:
+        print("File cannot found!!")
 
 
 def fit_data(spark, train=1.0, test=0.0):
@@ -119,3 +124,5 @@ if __name__ == '__main__':
 
     predictions = model.transform(test_set)
     predictions.show(50)
+
+
