@@ -40,7 +40,7 @@ if __name__ == "__main__":
     lr = LogisticRegression(maxIter=100)
     lrModel = lr.fit(train_df)
     predictions = lrModel.transform(val_df)
-    predictions.show()
+    predictions.sort('prediction', ascending=False).show()
     evaluator = BinaryClassificationEvaluator(rawPredictionCol="rawPrediction")
     evaluator.evaluate(predictions)
 
