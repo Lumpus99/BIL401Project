@@ -11,6 +11,8 @@ from pyspark.sql.functions import col, udf, avg
 
 
 def cleanData(text):
+    if text is None:
+        return ""
     usr = re.sub(r'@[^\s]+', '', text)  # remove users
     link = re.sub(r"http\S+", '', usr)  # remove links
     punctuations = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~1234567890"
@@ -32,8 +34,6 @@ def readfile(filename):
 
         convert_udf = udf(lambda z: cleanData(z))
         file_df = file_df.select("index", convert_udf(col("text")).alias("text"), "target")
-
-        file_df.show(50)
 
         print("Number of entries: ", file_df.count())
         return file_df
@@ -57,6 +57,7 @@ def runSpark():
 
                 model = PipelineModel.load('finalized_model')
                 predictions = model.transform(csv_data)
+                predictions.show(10)
                 predictions.select("text", "prediction").sort('prediction', ascending=False)\
                     .toPandas().to_csv("D:\\PyCharmProjects\\BIL401Project\\results_csv_files\\results_" + csv_file)
                 predictions.select(avg("prediction")).show()

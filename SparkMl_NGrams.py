@@ -2,7 +2,7 @@ import re
 from timeit import default_timer as timer
 
 import pyspark as ps
-from pyspark.ml import Pipeline, PipelineModel
+from pyspark.ml import Pipeline
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.feature import IDF, Tokenizer, NGram, VectorAssembler, CountVectorizer
 from pyspark.sql import SparkSession
@@ -17,16 +17,17 @@ def build_ngrams_wocs(n=3):
     ]
 
     cv = [
-        CountVectorizer(vocabSize=5460, inputCol="{0}_grams".format(i),
-                        outputCol="{0}_tf".format(i))
+        CountVectorizer(vocabSize=6000, inputCol="{0}_grams".format(i),
+                        outputCol="{0}_termFrequency".format(i))
         for i in range(1, n + 1)
     ]
-    idf = [IDF(inputCol="{0}_tf".format(i), outputCol="{0}_tfidf".format(i), minDocFreq=5) for i in range(1, n + 1)]
+    idf = [IDF(inputCol="{0}_termFrequency".format(i), outputCol="{0}_termFrequencyIdf".format(i), minDocFreq=6) for i in range(1, n + 1)]
 
     assembler = [VectorAssembler(
-        inputCols=["{0}_tfidf".format(i) for i in range(1, n + 1)],
+        inputCols=["{0}_termFrequencyIdf".format(i) for i in range(1, n + 1)],
         outputCol="features"
     )]
+
     lr = [LogisticRegression(labelCol="target")]
     return Pipeline(stages=tokenizer + ngrams + cv + idf + assembler + lr)
 
@@ -98,7 +99,7 @@ if __name__ == '__main__':
         .config(conf=conf) \
         .getOrCreate()
 
-    # fit_data(spark)
+    fit_data(spark, 0.8, 0.2)
     """
     Accuracy Score: 0.8068
     ROC-AUC: 0.8819
@@ -108,17 +109,20 @@ if __name__ == '__main__':
     Logistic:
     Accuracy Score: 0.7994
     Total time elapsed: 226.37 seconds.
+    
+    
 
     Accuracy Score: 0.3847
     ROC-AUC: 0.8779
     Total time elapsed: 392.58 seconds.
     """
-
+    """
     # do something with the model
     file_df = readfile("training.1600000.processed.noemoticon.csv")
-    (train_set, test_set) = file_df.randomSplit([0.9, 0.1], seed=2000)
+    (train_set, test_set) = file_df.randomSplit([0.8, 0.2], seed=2000)
 
     model = PipelineModel.load('finalized_model')
 
     predictions = model.transform(test_set)
     predictions.show(50)
+    """
