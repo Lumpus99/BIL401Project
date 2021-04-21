@@ -3,14 +3,14 @@ from api.Enums import AuthorizationType as At
 import json
 
 
-def twitterQueryExample(query, TWITTER_BEARER_TOKEN):
+def twitterQueryExample(query, TWITTER_BEARER_TOKEN, num=10):
     try:
         api = ApiObject.Api().text_field(("data",), ("text",))
 
         auth = Authorization.Authorization()
 
         api = api.url("https://api.twitter.com").path("/2/tweets/search/recent") \
-            .params({'query': query, 'max_results': '10'})
+            .params({'query': query, 'max_results': num})
 
         auth = auth.type(At.OAuth).key(TWITTER_BEARER_TOKEN).field("Bearer")
 
@@ -23,13 +23,14 @@ def twitterQueryExample(query, TWITTER_BEARER_TOKEN):
     except:
         print("Cannot find word(s) for Twitter!!!")
 
-def youtubeQueryExample(query, YOUTUBE_API_KEY):
+
+def youtubeQueryExample(query, YOUTUBE_API_KEY, num=5):
     api = ApiObject.Api().text_field(("items",), ("snippet", "topLevelComment", "snippet", "textOriginal"))
 
     auth = Authorization.Authorization()
     try:
         api = api.url(" https://youtube.googleapis.com").path("/youtube/v3/commentThreads") \
-            .params({'part': 'snippet', 'maxResults': '5', "videoId": query})
+            .params({'part': 'snippet', 'maxResults': num, "videoId": query})
         auth = auth.type(At.ApiKey).key(YOUTUBE_API_KEY).field("key")
         request2 = ApiRequest.ApiRequest(api, auth).pullData().parseData()
         youtube_array = []

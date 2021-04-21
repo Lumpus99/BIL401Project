@@ -1,29 +1,31 @@
-import json
 import csv
-import pyspark as ps
-from pyspark.ml import PipelineModel
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, monotonically_increasing_id, udf, avg
-from SparkMl_NGrams import cleanData
-import findspark
+import json
+import re
 import shutil
 
+import pyspark as ps
 from main import youtubeQueryExample, twitterQueryExample
+from pyspark.ml import PipelineModel
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, udf, avg
 
-findspark.init()
+
+def cleanData(text):
+    usr = re.sub(r'@[^\s]+', '', text)  # remove users
+    link = re.sub(r"http\S+", '', usr)  # remove links
+    punctuations = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~1234567890"
+    lowercase_str = link.lower()
+    for char in punctuations:
+        lowercase_str = lowercase_str.replace(char, '')
+    return ' '.join(lowercase_str.split()).strip()
 
 
 def readfile(filename):
     try:
         file_df = spark.read \
             .format("csv") \
-            .option("header", "false") \
+            .option("header", "true") \
             .load(filename)
-
-        file_df = file_df \
-            .withColumn("index", monotonically_increasing_id()) \
-            .withColumnRenamed("_c0", "target") \
-            .withColumnRenamed("_c5", "text")
         file_df = file_df.select("index", "text", "target")
 
         file_df.show(5)
@@ -31,7 +33,7 @@ def readfile(filename):
         convert_udf = udf(lambda z: cleanData(z))
         file_df = file_df.select("index", convert_udf(col("text")).alias("text"), "target")
 
-        file_df.show(5)
+        file_df.show(50)
 
         print("Number of entries: ", file_df.count())
         return file_df
@@ -39,72 +41,76 @@ def readfile(filename):
         print("File cannot found!!")
 
 
-if __name__ == '__main__':
-
+def runSpark():
     with open('api_tokens.json') as f:
         tokens = json.load(f)
     while True:
-        permission = input("Would you like to inspect a CSV File or download a file(CSV/DATA)? ")
-        if permission == "CSV":
-            conf = ps.SparkConf() \
-                .setMaster("local[*]") \
-                .setAppName("Merging")
-            spark = SparkSession.builder \
-                .config(conf=conf) \
-                .getOrCreate()
-            csv_file = input("Please enter your csv file=  ") #training.1600000.processed.noemoticon.csv
+        permission = input("Would you like to inspect a CSV File or download a file.\n1:Read a CSV\n2:Download Data\n?")
+        if permission == "1":
+
+            csv_file = input("Please enter your csv file name=  ")  # training.1600000.processed.noemoticon.csv
 
             csv_data = readfile("D:\\PyCharmProjects\\BIL401Project\\csv_files\\" + csv_file)
             if csv_data is None:
                 print("Failed to File Open...")
             else:
-                (train_set, test_set) = csv_data.randomSplit([0.9, 0.1], seed=2000)
 
                 model = PipelineModel.load('finalized_model')
-
-                predictions = model.transform(test_set)
+                predictions = model.transform(csv_data)
+                predictions.select("text", "prediction").sort('prediction', ascending=False)\
+                    .toPandas().to_csv("D:\\PyCharmProjects\\BIL401Project\\results_csv_files\\results_" + csv_file)
                 predictions.select(avg("prediction")).show()
+
+
             break
-        elif permission == "DATA":
+        elif permission == "2":
             while True:
-                yot = input("Would you like to gather YouTube or Twitter a file(YOUTUBE/TWITTER)? ")
-                if yot == "YOUTUBE":  # SdODv77CtIA
+                yot = input("Would you like to gather YouTube or Twitter a file\n1:YOUTUBE\n2:TWITTER\n?")
+                num = input("How many data you want to query?")
+
+                if yot == "1":  # SdODv77CtIA Youtube
                     while True:
-                        link = input("Enter your link's part after ?v=(DON'T INCLUDE IT)!!  ")
-                        y_array = youtubeQueryExample(link, tokens['youtube_api_key'])
+                        link = input("Enter youtube video id:")
+                        y_array = youtubeQueryExample(link, tokens['youtube_api_key'], num)
                         if y_array is None:
                             print("Writing to CSV failed...")
                         else:
-                            fieldnames = ['index', 'text', 'target']
-                            with open('youtube_file.csv', 'w') as csvfile:
-                                filewriter = csv.writer(csvfile)
-                                filewriter.writerow(['index', 'text', 'target'])
-                                for i in range(0, len(y_array)):
-                                    filewriter.writerow([i, y_array[i], 0])
-                            shutil.move("D:\\PyCharmProjects\\BIL401Project\\youtube_file.csv",
-                                        "D:\\PyCharmProjects\\BIL401Project\\csv_files\\youtube_file.csv")
+                            write_csv("youtube_file.csv", y_array)
                         break
                     break
-                elif yot == "TWITTER":
+                elif yot == "2":  # Twitter
                     while True:
-                        anyth = input("Enter any keyword= ")
-                        t_array = twitterQueryExample(anyth, tokens['twitter_bearer_token'])
+                        anyth = input("Enter twitter search query:")
+                        t_array = twitterQueryExample(anyth, tokens['twitter_bearer_token'], num)
                         if t_array is None:
                             print("Writing to CSV failed...")
                         else:
-                            fieldnames = ['index', 'text', 'target']
-                            with open('twitter_file.csv', 'w') as csvfile:
-                                filewriter = csv.writer(csvfile)
-                                filewriter.writerow(['index', 'text', 'target'])
-                                for i in range(0, len(t_array)):
-                                    filewriter.writerow([i, t_array[i], 0])
-                            shutil.move("D:\\PyCharmProjects\\BIL401Project\\twitter_file.csv",
-                                        "D:\\PyCharmProjects\\BIL401Project\\csv_files\\twitter_file.csv")
-
+                            write_csv("twitter_file.csv", t_array)
                         break
                     break
                 else:
-                    print("Please enter YOUTUBE or TWITTER")
+                    print("Please enter 1 for YOUTUBE or 2 for TWITTER")
             break
         else:
-            print("Please enter CSV or DATA")
+            print("Please enter 1 for CSV or 2 for DATA")
+
+
+def write_csv(filename, data):
+    with open(filename, 'w', newline='') as csvfile:
+        filewriter = csv.writer(csvfile)
+        filewriter.writerow(['index', 'text', 'target'])
+        for i in range(0, len(data)):
+            filewriter.writerow([i, data[i], 0])
+    shutil.move("D:\\PyCharmProjects\\BIL401Project\\" + filename,
+                "D:\\PyCharmProjects\\BIL401Project\\csv_files\\" + filename)
+
+
+if __name__ == '__main__':
+    conf = ps.SparkConf() \
+        .setMaster("local[*]") \
+        .setAppName("Merging")
+    spark = SparkSession.builder \
+        .config(conf=conf) \
+        .getOrCreate()
+
+    runSpark()
